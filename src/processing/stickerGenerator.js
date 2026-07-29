@@ -129,19 +129,32 @@ function normalizeCutout(image) {
   return makeStickerAsset(stickerImage, stickerCanvas.width, stickerCanvas.height);
 }
 
-export async function generateSticker(source) {
+export async function generateSticker(source, onProgress = () => {}) {
   // Camera photos already qualify, while the demo image is SVG. Rasterizing both
   // paths keeps the generator interface stable for future Vision/native adapters.
+  onProgress({ phase: "preparing", progress: 4 });
   const rasterSource = await rasterizeSource(source);
+  onProgress({ phase: "extracting", progress: 8 });
   const cutoutBlob = await removeBackground(rasterSource, {
     output: { format: "image/png" },
-    model: "isnet_quint8"
+    model: "isnet_quint8",
+    progress: (key, current, total) => {
+      const ratio = total > 0 ? current / total : 0;
+      onProgress({
+        phase: "extracting",
+        progress: Math.round(8 + ratio * 70),
+        key
+      });
+    }
   });
   const cutoutUrl = URL.createObjectURL(cutoutBlob);
 
   try {
+    onProgress({ phase: "outlining", progress: 86 });
     const image = await loadImage(cutoutUrl);
-    return normalizeCutout(image);
+    const asset = normalizeCutout(image);
+    onProgress({ phase: "ready", progress: 100 });
+    return asset;
   } finally {
     URL.revokeObjectURL(cutoutUrl);
   }
