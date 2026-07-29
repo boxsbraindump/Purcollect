@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
-import { Body, Bodies, Composite, Engine } from "matter-js";
+import { Body, Bodies, Composite, Engine, Events } from "matter-js";
 import { createStickerBody } from "../physics/stickerSpawner";
+import { resolveStickerAsset } from "../processing/stickerAsset";
 
 const MAX_GRAVITY = 1.45;
 
@@ -8,90 +9,47 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
-function roundedRect(context, x, y, width, height, radius) {
-  const r = Math.min(radius, width / 2, height / 2);
-  context.beginPath();
-  context.moveTo(x + r, y);
-  context.arcTo(x + width, y, x + width, y + height, r);
-  context.arcTo(x + width, y + height, x, y + height, r);
-  context.arcTo(x, y + height, x, y, r);
-  context.arcTo(x, y, x + width, y, r);
-  context.closePath();
-}
-
 function drawSticker(context, body, image, dpr) {
-  const size = body.plugin?.stickerSize || 150;
-  const half = size / 2;
-  const isCutout = Boolean(body.plugin?.purchase?.stickerCutout);
-  if (isCutout) {
-    context.save();
-    context.translate(body.position.x, body.position.y);
-    context.rotate(body.angle);
-    if (image?.complete && image.naturalWidth > 0) {
-      const imageRatio = image.naturalWidth / image.naturalHeight;
-      const frameSize = size * 0.86;
-      let drawWidth = frameSize;
-      let drawHeight = frameSize;
-      if (imageRatio > 1) drawHeight = frameSize / imageRatio;
-      else drawWidth = frameSize * imageRatio;
+  const stickerWidth = body.plugin?.stickerWidth || body.plugin?.stickerSize || 150;
+  const stickerHeight = body.plugin?.stickerHeight || body.plugin?.stickerSize || 150;
+  const hasBakedAsset = Boolean(body.plugin?.stickerAsset?.image);
 
-      // The cutout is normalized before it reaches the canvas. The white shadow
-      // follows its alpha edge, creating the physical sticker contour.
-      const outline = Math.max(2.5, size * 0.026);
-      context.globalCompositeOperation = "source-over";
+  context.save();
+  context.translate(body.position.x, body.position.y);
+  context.rotate(body.angle);
+
+  if (image?.complete && image.naturalWidth > 0) {
+    // Compatibility path for old locally saved cutouts. New assets already
+    // contain their white contour and must be drawn exactly once.
+    if (!hasBakedAsset && body.plugin?.purchase?.stickerCutout) {
+      const outline = Math.max(2.5, Math.min(stickerWidth, stickerHeight) * 0.026);
       context.filter = "brightness(0) invert(1)";
       for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
         context.drawImage(
           image,
-          -drawWidth / 2 + Math.cos(angle) * outline,
-          -drawHeight / 2 + Math.sin(angle) * outline,
-          drawWidth,
-          drawHeight
+          -stickerWidth / 2 + Math.cos(angle) * outline,
+          -stickerHeight / 2 + Math.sin(angle) * outline,
+          stickerWidth,
+          stickerHeight
         );
       }
       context.filter = "none";
-      context.shadowColor = "rgba(0, 0, 0, 0.14)";
-      context.shadowBlur = 5 * dpr;
-      context.shadowOffsetY = 3 * dpr;
-      context.drawImage(image, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
-      context.shadowColor = "transparent";
-      context.shadowBlur = 0;
-      context.shadowOffsetY = 0;
     }
-    context.restore();
-    return;
-  }
-  const radius = Math.min(24, size * 0.16);
-  context.save();
-  context.translate(body.position.x, body.position.y);
-  context.rotate(body.angle);
-  context.shadowColor = "rgba(0, 0, 0, 0.12)";
-  context.shadowBlur = 14 * dpr;
-  context.shadowOffsetY = 6 * dpr;
-  context.fillStyle = "#ffffff";
-  roundedRect(context, -half, -half, size, size, radius);
-  context.fill();
-  context.shadowColor = "transparent";
-  context.save();
-  roundedRect(context, -half + 8, -half + 8, size - 16, size - 16, Math.max(12, radius - 8));
-  context.clip();
-  if (image?.complete && image.naturalWidth > 0) {
-    const imageRatio = image.naturalWidth / image.naturalHeight;
-    const frameSize = size - 16;
-    let drawWidth = frameSize;
-    let drawHeight = frameSize;
-    if (imageRatio > 1) drawHeight = frameSize / imageRatio;
-    else drawWidth = frameSize * imageRatio;
-    context.drawImage(image, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+
+    context.shadowColor = "rgba(0, 0, 0, 0.12)";
+    context.shadowBlur = 10 * dpr;
+    context.shadowOffsetY = 4 * dpr;
+    context.drawImage(image, -stickerWidth / 2, -stickerHeight / 2, stickerWidth, stickerHeight);
+    context.shadowColor = "transparent";
+    context.shadowBlur = 0;
+    context.shadowOffsetY = 0;
   } else {
-    context.fillStyle = "#f1f1ef";
-    context.fillRect(-half + 8, -half + 8, size - 16, size - 16);
-    context.font = `${Math.round(size * 0.28)}px system-ui`;
+    context.fillStyle = "#111111";
+    context.font = `${Math.round(Math.min(stickerWidth, stickerHeight) * 0.28)}px system-ui`;
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.fillText("✦", 0, 0);
   }
-  context.restore();
   context.restore();
 }
 
@@ -145,12 +103,21 @@ export default function StickerPhysicsCanvas({ purchases, onCanvasReady }) {
       ];
       Composite.add(engine.world, walls);
       bodiesRef.current.forEach((body) => {
-        const half = (body.plugin?.stickerSize || 150) / 2;
+        const halfWidth = (body.plugin?.stickerWidth || body.plugin?.stickerSize || 150) / 2;
+        const halfHeight = (body.plugin?.stickerHeight || body.plugin?.stickerSize || 150) / 2;
         Body.setPosition(body, {
-          x: clamp(body.position.x, half + 2, width - half - 2),
-          y: clamp(body.position.y, half + 2, height - half - 2)
+          x: clamp(body.position.x, halfWidth + 2, width - halfWidth - 2),
+          y: clamp(body.position.y, halfHeight + 2, height - halfHeight - 2)
         });
       });
+    }
+
+    function loadPurchaseImage(purchase) {
+      const source = resolveStickerAsset(purchase)?.image;
+      if (!source) return;
+      const image = new Image();
+      image.onload = () => imagesRef.current.set(purchase.id, image);
+      image.src = source;
     }
 
     function syncBodies() {
@@ -167,12 +134,7 @@ export default function StickerPhysicsCanvas({ purchases, onCanvasReady }) {
         const body = createStickerBody({ purchase, index, width });
         bodiesRef.current.set(purchase.id, body);
         Composite.add(engine.world, body);
-        const source = purchase.sticker || purchase.image;
-        if (source) {
-          const image = new Image();
-          image.onload = () => imagesRef.current.set(purchase.id, image);
-          image.src = source;
-        }
+        loadPurchaseImage(purchase);
       });
     }
 
@@ -181,6 +143,22 @@ export default function StickerPhysicsCanvas({ purchases, onCanvasReady }) {
       bodiesRef.current.forEach((body) => drawSticker(context, body, imagesRef.current.get(body.label), dpr));
       Engine.update(engine, 1000 / 60);
       animationFrame = requestAnimationFrame(draw);
+    }
+
+    function guidePile() {
+      bodiesRef.current.forEach((body) => {
+        if (body.isSleeping) return;
+        const distanceFromCenter = width / 2 - body.position.x;
+        // A tiny center force keeps the collection balanced without turning the
+        // pile into a rigid layout. Friction and sleeping still control settling.
+        body.force.x += clamp(distanceFromCenter * 0.0000012, -0.00028, 0.00028) * body.mass;
+        if (body.position.y > height * 0.72) {
+          body.force.x += clamp(distanceFromCenter * 0.00000055, -0.00012, 0.00012) * body.mass;
+        }
+        const maxAngle = 25 * Math.PI / 180;
+        if (body.angle > maxAngle && body.angularVelocity > 0) Body.setAngularVelocity(body, body.angularVelocity * 0.7);
+        if (body.angle < -maxAngle && body.angularVelocity < 0) Body.setAngularVelocity(body, body.angularVelocity * 0.7);
+      });
     }
 
     function setGravity(horizontal, vertical) {
@@ -224,6 +202,7 @@ export default function StickerPhysicsCanvas({ purchases, onCanvasReady }) {
 
     setCanvasSize();
     syncBodies();
+    Events.on(engine, "beforeUpdate", guidePile);
     draw();
     onCanvasReady?.({ requestMotion });
     const resizeObserver = new ResizeObserver(setCanvasSize);
@@ -238,6 +217,7 @@ export default function StickerPhysicsCanvas({ purchases, onCanvasReady }) {
       container.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("deviceorientation", onOrientation, true);
       cancelAnimationFrame(animationFrame);
+      Events.off(engine, "beforeUpdate", guidePile);
       Composite.clear(engine.world, false);
       Engine.clear(engine);
       bodiesRef.current.clear();
@@ -264,7 +244,7 @@ export default function StickerPhysicsCanvas({ purchases, onCanvasReady }) {
       const body = createStickerBody({ purchase, index, width: rect.width });
       bodyMap.set(purchase.id, body);
       Composite.add(engine.world, body);
-      const source = purchase.sticker || purchase.image;
+      const source = resolveStickerAsset(purchase)?.image;
       if (source) {
         const image = new Image();
         image.onload = () => imagesRef.current.set(purchase.id, image);

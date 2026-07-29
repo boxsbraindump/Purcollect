@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { loadPurchases, savePurchases } from "../storage/storage";
 
 const AppStateContext = createContext(null);
-const emptyDraft = { image: "", sticker: "", amount: "" };
+const emptyDraft = { image: "", stickerAsset: null, amount: "" };
 
 export function AppStateProvider({ children }) {
   const [screen, setScreen] = useState("home");
@@ -23,8 +23,8 @@ export function AppStateProvider({ children }) {
     confirmPhoto() {
       setScreen("price");
     },
-    setSticker(sticker) {
-      setDraft((current) => ({ ...current, sticker }));
+    setSticker(stickerAsset) {
+      setDraft((current) => ({ ...current, stickerAsset }));
     },
     updateAmount(amount) {
       setDraft((current) => ({ ...current, amount }));
@@ -45,8 +45,9 @@ export function AppStateProvider({ children }) {
       setPurchases((current) => [...current, {
         id: `purchase-${Date.now()}`,
         image: draft.image,
-        sticker: draft.sticker || draft.image,
-        stickerCutout: Boolean(draft.sticker),
+        sticker: draft.stickerAsset?.image || draft.image,
+        stickerAsset: draft.stickerAsset || null,
+        stickerCutout: Boolean(draft.stickerAsset),
         amount,
         createdAt: new Date().toISOString()
       }]);
@@ -54,7 +55,7 @@ export function AppStateProvider({ children }) {
       setScreen("home");
       return true;
     }
-  }), [draft.amount, draft.image, draft.sticker]);
+  }), [draft.amount, draft.image, draft.stickerAsset]);
 
   const value = useMemo(() => ({ screen, purchases, draft, ...actions }), [actions, draft, purchases, screen]);
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

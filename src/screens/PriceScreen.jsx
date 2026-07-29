@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAppState } from "../state/AppState";
-import { createStickerImage } from "../processing/stickerProcessing";
+import { generateSticker } from "../processing/stickerGenerator";
 
 export default function PriceScreen() {
   const { draft, updateAmount, setSticker, backToPreview, collectPurchase } = useAppState();
@@ -11,11 +11,11 @@ export default function PriceScreen() {
     let active = true;
     setIsMaking(true);
     setProcessingError("");
-    setSticker("");
+    setSticker(null);
 
-    createStickerImage(draft.image)
-      .then((sticker) => {
-        if (active) setSticker(sticker);
+    generateSticker(draft.image)
+      .then((stickerAsset) => {
+        if (active) setSticker(stickerAsset);
       })
       .catch(() => {
         if (active) setProcessingError("Photo kept as a sticker");
@@ -46,8 +46,8 @@ export default function PriceScreen() {
         <span className="w-8" aria-hidden="true" />
       </header>
       <section className="flex flex-1 flex-col items-center px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-6">
-        <div className="flex w-full max-w-sm flex-1 items-center justify-center rounded-[1.5rem] bg-neutral-100 p-8">
-          <img className={`max-h-full max-w-full object-contain transition-opacity ${isMaking ? "opacity-45" : "opacity-100"}`} src={draft.sticker || draft.image} alt="Sticker being created" />
+        <div className="flex w-full max-w-sm flex-1 items-center justify-center p-8">
+          <img className={`max-h-full max-w-full object-contain transition-opacity ${isMaking ? "opacity-45" : "opacity-100"}`} src={draft.stickerAsset?.image || draft.image} alt="Sticker being created" />
         </div>
         <p className="mt-5 text-xs uppercase tracking-[0.16em] text-neutral-400">{isMaking ? "Making your sticker" : processingError || "Sticker ready"}</p>
         <label className="mt-8 text-sm text-neutral-500" htmlFor="amount">Price is required</label>
