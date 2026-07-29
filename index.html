@@ -87,12 +87,21 @@
         z-index: 4;
         display: flex;
         align-items: flex-start;
-        justify-content: space-between;
-        padding: 30px 28px 0;
+        justify-content: center;
+        padding: 30px 24px 0;
+        text-align: center;
+      }
+
+      .home-heading { width: 100%; }
+
+      .month-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
       }
 
       .eyebrow {
-        margin: 0 0 8px;
+        display: none;
         color: var(--muted);
         font-size: 10px;
         font-weight: 600;
@@ -103,9 +112,39 @@
 
       .month {
         margin: 0;
-        font-size: clamp(29px, 8vw, 40px);
-        font-weight: 600;
-        letter-spacing: -0.065em;
+        color: #92978a;
+        font-size: clamp(28px, 7vw, 36px);
+        font-weight: 500;
+        letter-spacing: -0.045em;
+        line-height: 0.95;
+      }
+
+      .month-chevron {
+        width: 9px;
+        height: 9px;
+        margin-top: -5px;
+        border-right: 2px solid #92978a;
+        border-bottom: 2px solid #92978a;
+        transform: rotate(45deg);
+      }
+
+      .total-wrap { margin-top: 104px; }
+
+      .total-label {
+        margin: 0 0 12px;
+        color: #8b8b87;
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .total {
+        margin: 0;
+        color: #22221f;
+        font-size: clamp(42px, 13vw, 68px);
+        font-weight: 500;
+        letter-spacing: -0.075em;
         line-height: 0.95;
       }
 
@@ -119,6 +158,7 @@
       }
 
       .collection-stage::after {
+        display: none;
         position: absolute;
         right: 18px;
         bottom: 42px;
@@ -130,6 +170,7 @@
       }
 
       .collection-hint {
+        display: none;
         position: absolute;
         right: 0;
         bottom: 76px;
@@ -155,7 +196,7 @@
 
       .sticker-field {
         position: absolute;
-        inset: 16px 14px 44px;
+        inset: 20px 14px 44px;
       }
 
       .sticker {
@@ -165,7 +206,7 @@
         position: absolute;
         display: grid;
         place-items: center;
-        width: clamp(104px, 34vw, 154px);
+        width: clamp(132px, 42vw, 190px);
         aspect-ratio: 1;
         overflow: visible;
         border: 0;
@@ -197,7 +238,7 @@
       }
 
       .sticker-emoji {
-        font-size: clamp(27px, 8vw, 38px);
+        font-size: clamp(56px, 18vw, 92px);
         line-height: 1;
         filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.06));
         animation: sticker-breathe 4200ms var(--ease) infinite;
@@ -709,9 +750,15 @@
       <section class="app-shell" aria-label="Collect purchase journal prototype">
         <div class="screen home-screen is-active" id="home-screen">
           <header class="home-header safe-top">
-            <div>
-              <p class="eyebrow">Collect</p>
-              <h1 class="month" id="month-label">July</h1>
+            <div class="home-heading">
+              <div class="month-row">
+                <h1 class="month" id="month-label">July</h1>
+                <span class="month-chevron" aria-hidden="true"></span>
+              </div>
+              <div class="total-wrap">
+                <p class="total-label">This month</p>
+                <p class="total" id="total-label">$128.50</p>
+              </div>
             </div>
           </header>
 
@@ -812,6 +859,7 @@
         const STORAGE_KEY = "collect-mvp-purchases-v1";
         const MONTH = new Intl.DateTimeFormat(undefined, { month: "long" }).format(new Date());
         const monthLabel = document.getElementById("month-label");
+        const totalLabel = document.getElementById("total-label");
         const stickerField = document.getElementById("sticker-field");
         const emptyState = document.getElementById("empty-state");
         const collectionHint = document.getElementById("collection-hint");
@@ -846,8 +894,8 @@
 
         const TILT_LIMIT = 10;
         const stickerPositions = [
-          [0.08, 0.08], [0.48, 0.18], [0.68, 0.46], [0.22, 0.62],
-          [0.55, 0.72], [0.03, 0.45], [0.76, 0.08], [0.38, 0.44]
+          [0.08, 0.18], [0.46, 0.12], [0.70, 0.30], [0.20, 0.48],
+          [0.55, 0.62], [0.02, 0.40], [0.74, 0.08], [0.38, 0.36]
         ];
 
         const BACKGROUND_REMOVAL_URL = "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.6.0/+esm";
@@ -949,10 +997,8 @@
           const maxLeft = Math.max(safe, fieldWidth - stickerWidth - safe);
           const maxTop = Math.max(safe, fieldHeight - stickerHeight - safe);
           const position = stickerPositions[index % stickerPositions.length];
-          const savedLeft = Number.parseFloat(purchase?.left);
-          const savedTop = Number.parseFloat(purchase?.top);
-          const preferredLeft = Number.isFinite(savedLeft) ? (savedLeft / 100) * fieldWidth : safe + position[0] * Math.max(0, maxLeft - safe);
-          const preferredTop = Number.isFinite(savedTop) ? (savedTop / 100) * fieldHeight : safe + position[1] * Math.max(0, maxTop - safe);
+          const preferredLeft = safe + position[0] * Math.max(0, maxLeft - safe);
+          const preferredTop = safe + position[1] * Math.max(0, maxTop - safe);
           sticker.style.left = `${Math.round(clamp(preferredLeft, safe, maxLeft))}px`;
           sticker.style.top = `${Math.round(clamp(preferredTop, safe, maxTop))}px`;
         }
@@ -962,6 +1008,8 @@
         }
 
         function renderHome() {
+          const total = purchases.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+          totalLabel.textContent = money(total);
           stickerField.innerHTML = "";
           emptyState.hidden = purchases.length > 0;
           collectionHint.classList.toggle("is-hidden", purchases.length > 0);
