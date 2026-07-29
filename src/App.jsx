@@ -3,6 +3,7 @@ import { AppStateProvider, useAppState } from "./state/AppState";
 import HomeScreen from "./screens/HomeScreen";
 import CaptureScreen from "./screens/CaptureScreen";
 import PreviewScreen from "./screens/PreviewScreen";
+import StickerProcessingScreen from "./screens/StickerProcessingScreen";
 import PriceScreen from "./screens/PriceScreen";
 
 function AppContent() {
@@ -13,6 +14,7 @@ function AppContent() {
 
   if (screen === "capture") return <CaptureScreen />;
   if (screen === "preview") return <PreviewScreen />;
+  if (screen === "processing") return <StickerProcessingScreen />;
   if (screen === "price") return <PriceScreen />;
   return <HomeScreen physicsController={physicsController} />;
 }

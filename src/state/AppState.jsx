@@ -21,10 +21,14 @@ export function AppStateProvider({ children }) {
       setScreen("preview");
     },
     confirmPhoto() {
-      setScreen("price");
+      setScreen("processing");
     },
     setSticker(stickerAsset) {
       setDraft((current) => ({ ...current, stickerAsset }));
+    },
+    finishSticker(stickerAsset) {
+      setDraft((current) => ({ ...current, stickerAsset }));
+      setScreen("price");
     },
     updateAmount(amount) {
       setDraft((current) => ({ ...current, amount }));
