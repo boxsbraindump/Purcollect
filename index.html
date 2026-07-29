@@ -109,25 +109,6 @@
         line-height: 0.95;
       }
 
-      .total-wrap { text-align: right; }
-      .total-label {
-        margin: 0 0 8px;
-        color: var(--muted);
-        font-size: 10px;
-        font-weight: 600;
-        letter-spacing: 0.09em;
-        line-height: 1;
-        text-transform: uppercase;
-      }
-
-      .total {
-        margin: 0;
-        font-size: clamp(22px, 6vw, 30px);
-        font-weight: 600;
-        letter-spacing: -0.055em;
-        line-height: 0.95;
-      }
-
       .collection-stage {
         position: relative;
         flex: 1;
@@ -218,6 +199,10 @@
         font-size: clamp(27px, 8vw, 38px);
         line-height: 1;
         filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.06));
+        animation: sticker-breathe 4200ms var(--ease) infinite;
+        animation-delay: var(--wobble-delay, 0ms);
+        transform-origin: 50% 86%;
+        will-change: transform;
       }
 
       .sticker-photo {
@@ -240,20 +225,17 @@
         height: 100%;
         border-radius: 0;
         filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.1));
+        animation: sticker-breathe 4200ms var(--ease) infinite;
+        animation-delay: var(--wobble-delay, 0ms);
+        transform-origin: 50% 86%;
+        will-change: transform;
       }
 
-      .sticker-price {
-        position: absolute;
-        right: -5px;
-        bottom: -7px;
-        padding: 5px 8px;
-        border: 2px solid #fff;
-        border-radius: 999px;
-        background: var(--ink);
-        color: #fff;
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: -0.02em;
+      .sticker:not(.is-cutout) .sticker-photo {
+        animation: sticker-breathe 4200ms var(--ease) infinite;
+        animation-delay: var(--wobble-delay, 0ms);
+        transform-origin: 50% 86%;
+        will-change: transform;
       }
 
       .empty-state {
@@ -655,6 +637,26 @@
         66% { transform: translate(-4px, 2px) rotate(calc(var(--rotate) - 2deg)) scale(calc(var(--scale) * 0.98)); }
       }
 
+      @keyframes sticker-breathe {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        22% { transform: translateY(-2px) rotate(-1.6deg); }
+        48% { transform: translateY(1px) rotate(1.8deg); }
+        72% { transform: translateY(-1px) rotate(-0.8deg); }
+      }
+
+      .sticker.is-shaking > .sticker-photo,
+      .sticker.is-shaking > .sticker-emoji {
+        animation: sticker-shake 520ms var(--ease) both;
+      }
+
+      @keyframes sticker-shake {
+        0%, 100% { transform: rotate(0deg) translateX(0); }
+        20% { transform: rotate(-7deg) translateX(-3px); }
+        40% { transform: rotate(6deg) translateX(3px); }
+        60% { transform: rotate(-4deg) translateX(-2px); }
+        80% { transform: rotate(2deg) translateX(1px); }
+      }
+
       @media (max-width: 650px) {
         body { background: var(--paper); }
         .prototype-wrap { padding: 0; }
@@ -687,10 +689,6 @@
             <div>
               <p class="eyebrow">Collect</p>
               <h1 class="month" id="month-label">July</h1>
-            </div>
-            <div class="total-wrap">
-              <p class="total-label">This month</p>
-              <p class="total" id="total-label">$128.50</p>
             </div>
           </header>
 
@@ -791,7 +789,6 @@
         const STORAGE_KEY = "collect-mvp-purchases-v1";
         const MONTH = new Intl.DateTimeFormat(undefined, { month: "long" }).format(new Date());
         const monthLabel = document.getElementById("month-label");
-        const totalLabel = document.getElementById("total-label");
         const stickerField = document.getElementById("sticker-field");
         const emptyState = document.getElementById("empty-state");
         const collectionHint = document.getElementById("collection-hint");
@@ -873,8 +870,6 @@
         }
 
         function renderHome() {
-          const total = purchases.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-          totalLabel.textContent = money(total);
           stickerField.innerHTML = "";
           emptyState.hidden = purchases.length > 0;
           collectionHint.classList.toggle("is-hidden", purchases.length > 0);
@@ -887,6 +882,7 @@
             sticker.setAttribute("aria-label", `View purchase ${money(purchase.amount)}`);
             sticker.style.setProperty("--rotate", `${purchase.rotate ?? ((index % 5) - 2) * 4}deg`);
             sticker.style.setProperty("--scale", `${purchase.scale ?? (0.88 + ((index * 13) % 18) / 100)}`);
+            sticker.style.setProperty("--wobble-delay", `${(index * 470) % 1800}ms`);
             sticker.style.setProperty("--sticker-bg", purchase.bg || colors[index % colors.length]);
             sticker.style.left = purchase.left || `${18 + ((index * 29) % 64)}%`;
             sticker.style.top = purchase.top || `${15 + ((index * 21) % 64)}%`;
@@ -906,11 +902,14 @@
               sticker.appendChild(emoji);
             }
 
-            const price = document.createElement("span");
-            price.className = "sticker-price";
-            price.textContent = money(purchase.amount);
-            sticker.appendChild(price);
-
+            sticker.addEventListener("pointerdown", () => {
+              sticker.classList.remove("is-shaking");
+              void sticker.offsetWidth;
+              sticker.classList.add("is-shaking");
+            });
+            sticker.addEventListener("animationend", (event) => {
+              if (event.animationName === "sticker-shake") sticker.classList.remove("is-shaking");
+            });
             sticker.addEventListener("click", () => openDetail(purchase));
             stickerField.appendChild(sticker);
 
