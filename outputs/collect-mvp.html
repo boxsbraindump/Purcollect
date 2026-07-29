@@ -161,6 +161,7 @@
       .sticker {
         --rotate: 0deg;
         --scale: 1;
+        --depth: 0.72;
         position: absolute;
         display: grid;
         place-items: center;
@@ -172,7 +173,7 @@
         background: transparent;
         box-shadow: none;
         cursor: pointer;
-        transform: rotate(var(--rotate)) scale(var(--scale));
+        transform: translate3d(calc(var(--tilt-x, 0px) * var(--depth)), calc(var(--tilt-y, 0px) * var(--depth)), 0) rotate(var(--rotate)) scale(var(--scale));
         transition: transform 220ms var(--ease), box-shadow 220ms ease, filter 220ms ease;
         will-change: transform;
       }
@@ -182,7 +183,7 @@
       .sticker:hover, .sticker:focus-visible {
         z-index: 10;
         filter: saturate(1.08);
-        transform: rotate(var(--rotate)) scale(calc(var(--scale) * 1.08));
+        transform: translate3d(calc(var(--tilt-x, 0px) * var(--depth)), calc(var(--tilt-y, 0px) * var(--depth)), 0) rotate(var(--rotate)) scale(calc(var(--scale) * 1.08));
       }
 
       .sticker.is-dropping {
@@ -275,12 +276,34 @@
       .gesture-action:hover { border-color: #bcbcbc; color: var(--ink); }
       .gesture-action:active { transform: translateY(1px) scale(0.98); }
 
-      .gesture-arrow {
-        display: inline-block;
-        font-size: 18px;
-        line-height: 1;
-        transform: translateY(-1px);
+      .gesture-action.plus-action {
+        width: 72px;
+        height: 72px;
+        min-height: 72px;
+        padding: 0;
+        border-color: var(--ink);
+        border-radius: 50%;
+        background: var(--ink);
+        color: #fff;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.14);
       }
+
+      .gesture-action.plus-action:hover {
+        border-color: #2c2c2c;
+        background: #2c2c2c;
+        color: #fff;
+        transform: translateY(-1px) scale(1.03);
+      }
+
+      .gesture-action.plus-action:active { transform: scale(0.95); }
+
+      .plus-symbol {
+        font-size: 38px;
+        font-weight: 300;
+        line-height: 1;
+      }
+
+      .plus-action .gesture-arrow { display: none; }
 
       .flow-header {
         display: flex;
@@ -697,14 +720,14 @@
             <div class="empty-state" id="empty-state">Your month starts with one small thing.</div>
             <div class="collection-hint" id="collection-hint">
               <span class="hint-line" aria-hidden="true"></span>
-              <span>Swipe up to collect</span>
+              <span>Tap + to collect</span>
             </div>
           </section>
 
           <footer class="home-footer safe-bottom">
-            <button class="gesture-action" id="open-capture" type="button" aria-label="Open camera to collect a purchase">
-              <span class="gesture-arrow" aria-hidden="true">↑</span>
-              <span>Add a purchase</span>
+            <button class="gesture-action plus-action" id="open-capture" type="button" aria-label="Add a purchase">
+              <span class="plus-symbol" aria-hidden="true">+</span>
+              <span class="sr-only">Add a purchase</span>
             </button>
           </footer>
         </div>
@@ -792,7 +815,7 @@
         const stickerField = document.getElementById("sticker-field");
         const emptyState = document.getElementById("empty-state");
         const collectionHint = document.getElementById("collection-hint");
-        const stage = document.getElementById("collection-stage");
+        const appShell = document.querySelector(".app-shell");
         const cameraViewport = document.querySelector(".camera-viewport");
         const cameraVideo = document.getElementById("camera-video");
         const cameraStatus = document.getElementById("camera-status");
@@ -815,11 +838,17 @@
         };
 
         let draft = { image: "", sticker: "", isCutout: false, hasPhoto: false, generationDone: false, generationTimer: null, saveTimer: null, generationToken: 0 };
-        let touchStartY = 0;
-        let touchStartX = 0;
         let lastDropId = null;
         let cameraStream = null;
         let backgroundRemovalPromise = null;
+        let motionReady = false;
+        let motionPermissionRequested = false;
+
+        const TILT_LIMIT = 10;
+        const stickerPositions = [
+          [0.08, 0.08], [0.48, 0.18], [0.68, 0.46], [0.22, 0.62],
+          [0.55, 0.72], [0.03, 0.45], [0.76, 0.08], [0.38, 0.44]
+        ];
 
         const BACKGROUND_REMOVAL_URL = "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.6.0/+esm";
 
@@ -869,6 +898,69 @@
           if (name === "home") renderHome();
         }
 
+        function clamp(value, min, max) {
+          return Math.min(Math.max(value, min), max);
+        }
+
+        function setTilt(horizontal, vertical) {
+          const x = clamp(horizontal, -1, 1) * TILT_LIMIT;
+          const y = clamp(vertical, -1, 1) * TILT_LIMIT;
+          stickerField.style.setProperty("--tilt-x", `${x.toFixed(2)}px`);
+          stickerField.style.setProperty("--tilt-y", `${y.toFixed(2)}px`);
+        }
+
+        function handleDeviceOrientation(event) {
+          if (event.gamma == null && event.beta == null) return;
+          setTilt(Number(event.gamma || 0) / 35, Number(event.beta || 0) / 35);
+        }
+
+        function handlePointerTilt(event) {
+          if (motionReady) return;
+          const rect = appShell.getBoundingClientRect();
+          setTilt(((event.clientX - rect.left) / rect.width - 0.5) * 1.4, ((event.clientY - rect.top) / rect.height - 0.5) * 1.4);
+        }
+
+        function attachDeviceOrientation() {
+          if (motionReady) return;
+          window.addEventListener("deviceorientation", handleDeviceOrientation, true);
+          motionReady = true;
+        }
+
+        function enableMotion() {
+          if (motionPermissionRequested) return;
+          motionPermissionRequested = true;
+          if (typeof window.DeviceOrientationEvent === "undefined") return;
+          const requestPermission = window.DeviceOrientationEvent.requestPermission;
+          if (typeof requestPermission === "function") {
+            requestPermission.call(window.DeviceOrientationEvent).then((permission) => {
+              if (permission === "granted") attachDeviceOrientation();
+            }).catch(() => {});
+          } else {
+            attachDeviceOrientation();
+          }
+        }
+
+        function layoutSticker(sticker, purchase, index) {
+          const fieldWidth = stickerField.clientWidth;
+          const fieldHeight = stickerField.clientHeight;
+          const stickerWidth = sticker.offsetWidth;
+          const stickerHeight = sticker.offsetHeight;
+          const safe = 18 + TILT_LIMIT + stickerWidth * 0.08;
+          const maxLeft = Math.max(safe, fieldWidth - stickerWidth - safe);
+          const maxTop = Math.max(safe, fieldHeight - stickerHeight - safe);
+          const position = stickerPositions[index % stickerPositions.length];
+          const savedLeft = Number.parseFloat(purchase?.left);
+          const savedTop = Number.parseFloat(purchase?.top);
+          const preferredLeft = Number.isFinite(savedLeft) ? (savedLeft / 100) * fieldWidth : safe + position[0] * Math.max(0, maxLeft - safe);
+          const preferredTop = Number.isFinite(savedTop) ? (savedTop / 100) * fieldHeight : safe + position[1] * Math.max(0, maxTop - safe);
+          sticker.style.left = `${Math.round(clamp(preferredLeft, safe, maxLeft))}px`;
+          sticker.style.top = `${Math.round(clamp(preferredTop, safe, maxTop))}px`;
+        }
+
+        function layoutAllStickers() {
+          [...stickerField.children].forEach((sticker, index) => layoutSticker(sticker, purchases[index], index));
+        }
+
         function renderHome() {
           stickerField.innerHTML = "";
           emptyState.hidden = purchases.length > 0;
@@ -882,10 +974,9 @@
             sticker.setAttribute("aria-label", `View purchase ${money(purchase.amount)}`);
             sticker.style.setProperty("--rotate", `${purchase.rotate ?? ((index % 5) - 2) * 4}deg`);
             sticker.style.setProperty("--scale", `${purchase.scale ?? (0.88 + ((index * 13) % 18) / 100)}`);
+            sticker.style.setProperty("--depth", `${0.58 + (index % 4) * 0.12}`);
             sticker.style.setProperty("--wobble-delay", `${(index * 470) % 1800}ms`);
             sticker.style.setProperty("--sticker-bg", purchase.bg || colors[index % colors.length]);
-            sticker.style.left = purchase.left || `${18 + ((index * 29) % 64)}%`;
-            sticker.style.top = purchase.top || `${15 + ((index * 21) % 64)}%`;
 
             const imageSource = purchase.sticker || purchase.image;
             if (imageSource) {
@@ -909,9 +1000,12 @@
             });
             sticker.addEventListener("animationend", (event) => {
               if (event.animationName === "sticker-shake") sticker.classList.remove("is-shaking");
+              if (event.animationName === "sticker-drop") sticker.classList.remove("is-dropping");
+              if (event.animationName === "sticker-ripple") sticker.classList.remove("is-rippling");
             });
             sticker.addEventListener("click", () => openDetail(purchase));
             stickerField.appendChild(sticker);
+            layoutSticker(sticker, purchase, index);
 
             if (purchase.id === lastDropId) {
               requestAnimationFrame(() => sticker.classList.add("is-dropping"));
@@ -921,6 +1015,7 @@
           });
 
           lastDropId = null;
+          layoutAllStickers();
         }
 
         function openDetail(purchase) {
@@ -1102,6 +1197,7 @@
         }
 
         function openCapture() {
+          enableMotion();
           closeDetail();
           resetDraft();
           showScreen("capture");
@@ -1282,34 +1378,22 @@
           }
         });
 
-        stage.addEventListener("pointerdown", (event) => {
-          if (!event.isPrimary) return;
-          touchStartY = event.clientY;
-          touchStartX = event.clientX;
-          stage.setPointerCapture?.(event.pointerId);
-        });
-
-        stage.addEventListener("pointerup", (event) => {
-          if (!event.isPrimary) return;
-          const deltaY = event.clientY - touchStartY;
-          const deltaX = event.clientX - touchStartX;
-          if (deltaY < -48 && Math.abs(deltaY) > Math.abs(deltaX) * 1.15) {
-            event.preventDefault();
-            openCapture();
-          }
-        });
-
-        stage.addEventListener("click", (event) => {
-          const clickedEmptyArea = event.target === stage || event.target === stickerField || event.target === emptyState || event.target === collectionHint;
-          if (clickedEmptyArea) openCapture();
-        });
-
         window.addEventListener("keydown", (event) => {
           if (event.key === "Escape") {
             if (detailSheet.classList.contains("is-open")) closeDetail();
             else showScreen("home");
           }
-          if (event.key === "ArrowUp" && screens.home.classList.contains("is-active")) openCapture();
+        });
+
+        if (window.matchMedia("(pointer: fine)").matches) {
+          appShell.addEventListener("pointermove", handlePointerTilt, { passive: true });
+          appShell.addEventListener("pointerleave", () => {
+            if (!motionReady) setTilt(0, 0);
+          });
+        }
+
+        window.addEventListener("resize", () => {
+          if (screens.home.classList.contains("is-active")) requestAnimationFrame(layoutAllStickers);
         });
 
         try {
