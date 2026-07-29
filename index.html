@@ -1,0 +1,1081 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#ffffff" />
+    <title>Collect MVP</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #111111;
+        --muted: #747474;
+        --line: #e7e7e7;
+        --soft: #f6f6f6;
+        --paper: #ffffff;
+        --scrim: rgba(17, 17, 17, 0.56);
+        --radius: 18px;
+        --ease: cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        min-height: 100%;
+        margin: 0;
+        background: #f1f1f1;
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+
+      body { overflow: hidden; }
+
+      button, input { font: inherit; }
+      button { color: inherit; }
+      button:focus-visible, input:focus-visible {
+        outline: 2px solid var(--ink);
+        outline-offset: 3px;
+      }
+
+      .prototype-wrap {
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 16px;
+      }
+
+      .app-shell {
+        position: relative;
+        width: min(100%, 430px);
+        height: min(900px, calc(100dvh - 32px));
+        min-height: 620px;
+        overflow: hidden;
+        background: var(--paper);
+        border: 1px solid #dedede;
+        border-radius: 30px;
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.13);
+        isolation: isolate;
+      }
+
+      .screen {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        background: var(--paper);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(18px);
+        transition: opacity 260ms var(--ease), transform 360ms var(--ease);
+      }
+
+      .screen.is-active {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+      }
+
+      .safe-top { padding-top: max(16px, env(safe-area-inset-top)); }
+      .safe-bottom { padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+
+      .home-screen { touch-action: pan-y; }
+
+      .home-header {
+        position: relative;
+        z-index: 4;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        padding: 30px 28px 0;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      .month {
+        margin: 0;
+        font-size: clamp(29px, 8vw, 40px);
+        font-weight: 600;
+        letter-spacing: -0.065em;
+        line-height: 0.95;
+      }
+
+      .total-wrap { text-align: right; }
+      .total-label {
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.09em;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      .total {
+        margin: 0;
+        font-size: clamp(22px, 6vw, 30px);
+        font-weight: 600;
+        letter-spacing: -0.055em;
+        line-height: 0.95;
+      }
+
+      .collection-stage {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+        margin-top: 6px;
+        touch-action: pan-y;
+      }
+
+      .collection-stage::after {
+        position: absolute;
+        right: 18px;
+        bottom: 42px;
+        left: 18px;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--line) 18%, var(--line) 82%, transparent);
+        content: "";
+        opacity: 0.8;
+      }
+
+      .collection-hint {
+        position: absolute;
+        right: 0;
+        bottom: 76px;
+        left: 0;
+        z-index: 3;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        color: #9a9a9a;
+        font-size: 12px;
+        pointer-events: none;
+        transition: opacity 200ms ease;
+      }
+
+      .collection-hint.is-hidden { opacity: 0; }
+
+      .hint-line {
+        width: 30px;
+        height: 1px;
+        background: #b5b5b5;
+      }
+
+      .sticker-field {
+        position: absolute;
+        inset: 16px 14px 44px;
+      }
+
+      .sticker {
+        --rotate: 0deg;
+        --scale: 1;
+        position: absolute;
+        display: grid;
+        place-items: center;
+        width: clamp(54px, 17vw, 78px);
+        aspect-ratio: 1;
+        overflow: visible;
+        border: 0;
+        border-radius: 22px;
+        background: var(--sticker-bg, #f2b5a8);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.09), inset 0 0 0 1px rgba(255, 255, 255, 0.42);
+        cursor: pointer;
+        transform: rotate(var(--rotate)) scale(var(--scale));
+        transition: transform 220ms var(--ease), box-shadow 220ms ease, filter 220ms ease;
+        will-change: transform;
+      }
+
+      .sticker::before {
+        position: absolute;
+        inset: -4px;
+        z-index: -1;
+        border: 2px solid #fff;
+        border-radius: 25px;
+        content: "";
+        filter: drop-shadow(0 5px 5px rgba(0, 0, 0, 0.08));
+      }
+
+      .sticker:hover, .sticker:focus-visible {
+        z-index: 10;
+        box-shadow: 0 14px 26px rgba(0, 0, 0, 0.15), inset 0 0 0 1px rgba(255, 255, 255, 0.48);
+        filter: saturate(1.08);
+        transform: rotate(var(--rotate)) scale(calc(var(--scale) * 1.08));
+      }
+
+      .sticker.is-dropping {
+        animation: sticker-drop 880ms var(--ease) both;
+      }
+
+      .sticker-emoji {
+        font-size: clamp(27px, 8vw, 38px);
+        line-height: 1;
+        filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.06));
+      }
+
+      .sticker-photo {
+        width: 78%;
+        height: 78%;
+        border-radius: 16px;
+        object-fit: cover;
+      }
+
+      .sticker-price {
+        position: absolute;
+        right: -5px;
+        bottom: -7px;
+        padding: 4px 7px;
+        border: 2px solid #fff;
+        border-radius: 999px;
+        background: var(--ink);
+        color: #fff;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .empty-state {
+        position: absolute;
+        top: 41%;
+        right: 24px;
+        left: 24px;
+        color: #9b9b9b;
+        font-size: 14px;
+        line-height: 1.45;
+        text-align: center;
+      }
+
+      .home-footer {
+        position: relative;
+        z-index: 4;
+        display: flex;
+        justify-content: center;
+        padding: 12px 20px 18px;
+      }
+
+      .gesture-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 44px;
+        padding: 0 16px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #fff;
+        color: #6e6e6e;
+        font-size: 12px;
+        cursor: pointer;
+        transition: transform 180ms ease, border-color 180ms ease, color 180ms ease;
+      }
+
+      .gesture-action:hover { border-color: #bcbcbc; color: var(--ink); }
+      .gesture-action:active { transform: translateY(1px) scale(0.98); }
+
+      .gesture-arrow {
+        display: inline-block;
+        font-size: 18px;
+        line-height: 1;
+        transform: translateY(-1px);
+      }
+
+      .flow-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 23px 22px 15px;
+      }
+
+      .flow-title {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      .text-button {
+        min-height: 38px;
+        padding: 0 2px;
+        border: 0;
+        background: transparent;
+        color: #6c6c6c;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      .text-button:hover { color: var(--ink); }
+
+      .capture-body, .preview-body, .price-body {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-height: 0;
+        padding: 10px 20px 22px;
+      }
+
+      .camera-viewport, .photo-preview {
+        position: relative;
+        display: grid;
+        flex: 1;
+        min-height: 360px;
+        place-items: center;
+        overflow: hidden;
+        border-radius: 24px;
+        background: #161616;
+      }
+
+      .camera-viewport::before {
+        position: absolute;
+        inset: 19px;
+        border: 1px solid rgba(255, 255, 255, 0.45);
+        border-radius: 18px;
+        content: "";
+      }
+
+      .camera-crosshair {
+        position: absolute;
+        width: 30px;
+        height: 30px;
+        border: 1px solid rgba(255, 255, 255, 0.55);
+        border-radius: 50%;
+      }
+
+      .camera-crosshair::before, .camera-crosshair::after {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.55);
+        content: "";
+      }
+
+      .camera-crosshair::before { top: 14px; right: -10px; left: -10px; height: 1px; }
+      .camera-crosshair::after { top: -10px; bottom: -10px; left: 14px; width: 1px; }
+
+      .camera-copy {
+        position: absolute;
+        right: 0;
+        bottom: 28px;
+        left: 0;
+        color: rgba(255, 255, 255, 0.76);
+        font-size: 12px;
+        text-align: center;
+      }
+
+      .camera-controls, .preview-actions {
+        display: grid;
+        grid-template-columns: 1fr 1.2fr;
+        gap: 10px;
+        padding-top: 14px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 50px;
+        border: 1px solid var(--ink);
+        border-radius: 14px;
+        background: var(--ink);
+        color: #fff;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 180ms ease, background 180ms ease, color 180ms ease;
+      }
+
+      .button:hover { background: #2c2c2c; }
+      .button:active { transform: scale(0.98); }
+
+      .button.secondary {
+        background: #fff;
+        color: var(--ink);
+      }
+
+      .button.secondary:hover { background: var(--soft); }
+
+      .button:disabled {
+        cursor: wait;
+        opacity: 0.42;
+      }
+
+      .photo-preview { background: #f1f1f1; }
+      .photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+
+      .sample-product {
+        display: grid;
+        width: 152px;
+        aspect-ratio: 0.78;
+        place-items: center;
+        border-radius: 40px 40px 34px 34px;
+        background: linear-gradient(160deg, #a9d9cc 0 54%, #f3d6aa 54%);
+        box-shadow: 0 24px 38px rgba(0,0,0,0.14);
+        color: #151515;
+        font-size: 64px;
+      }
+
+      .sample-product::after {
+        position: absolute;
+        margin-top: -228px;
+        width: 72px;
+        height: 9px;
+        border-radius: 999px;
+        background: #212121;
+        content: "";
+      }
+
+      .preview-caption {
+        margin: 16px 2px 0;
+        color: #777;
+        font-size: 12px;
+        line-height: 1.4;
+        text-align: center;
+      }
+
+      .price-body { align-items: center; justify-content: center; padding-top: 0; }
+
+      .processing-card {
+        position: relative;
+        display: grid;
+        width: min(100%, 280px);
+        aspect-ratio: 0.92;
+        place-items: center;
+        margin-bottom: 24px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: #fafafa;
+      }
+
+      .processing-card.has-photo img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: saturate(0.82) contrast(0.92);
+        opacity: 0.28;
+        transition: opacity 500ms ease, filter 500ms ease;
+      }
+
+      .processing-card.is-ready img { opacity: 1; filter: saturate(1) contrast(1); }
+
+      .processing-art { font-size: 86px; transition: transform 500ms var(--ease), filter 500ms ease; }
+      .processing-card.is-ready .processing-art { transform: scale(1.08) rotate(-3deg); filter: saturate(1.05); }
+
+      .processing-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 20px;
+        background: rgba(17,17,17,0.28);
+        color: #fff;
+        text-align: center;
+        transition: opacity 400ms ease;
+      }
+
+      .processing-card.is-ready .processing-overlay { opacity: 0; pointer-events: none; }
+
+      .processing-label { font-size: 12px; font-weight: 600; letter-spacing: 0.02em; }
+
+      .progress-track {
+        width: min(170px, 70%);
+        height: 3px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.35);
+      }
+
+      .progress-bar { width: 0; height: 100%; border-radius: inherit; background: #fff; transition: width 120ms linear; }
+      .progress-value { font-variant-numeric: tabular-nums; font-size: 11px; opacity: 0.8; }
+
+      .price-label {
+        margin: 0 0 13px;
+        color: #858585;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .price-entry {
+        display: flex;
+        align-items: center;
+        width: min(100%, 280px);
+        border-bottom: 2px solid var(--ink);
+      }
+
+      .currency { margin-right: 8px; font-size: 30px; font-weight: 500; letter-spacing: -0.06em; }
+
+      #amount-input {
+        width: 100%;
+        min-width: 0;
+        padding: 0 0 10px;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--ink);
+        font-size: 42px;
+        font-weight: 600;
+        letter-spacing: -0.08em;
+        line-height: 1;
+        text-align: left;
+      }
+
+      #amount-input::placeholder { color: #c7c7c7; }
+
+      .price-status {
+        min-height: 18px;
+        margin-top: 12px;
+        color: #8b8b8b;
+        font-size: 12px;
+        text-align: center;
+      }
+
+      .price-status.is-ready { color: var(--ink); }
+
+      .detail-sheet {
+        position: absolute;
+        inset: auto 10px 10px;
+        z-index: 30;
+        padding: 18px;
+        border: 1px solid #dedede;
+        border-radius: 22px;
+        background: rgba(255,255,255,0.98);
+        box-shadow: 0 18px 50px rgba(0,0,0,0.18);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(16px);
+        transition: opacity 220ms ease, transform 260ms var(--ease);
+      }
+
+      .detail-sheet.is-open { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+      .detail-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .detail-title { margin: 0; font-size: 14px; font-weight: 600; }
+      .detail-close { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 50%; background: #fff; cursor: pointer; }
+      .detail-content { display: grid; grid-template-columns: 76px 1fr; align-items: center; gap: 14px; padding-top: 16px; }
+      .detail-art { display: grid; width: 76px; aspect-ratio: 1; place-items: center; border-radius: 18px; font-size: 38px; }
+      .detail-meta { display: grid; gap: 6px; }
+      .detail-meta strong { font-size: 24px; letter-spacing: -0.06em; }
+      .detail-meta span { color: var(--muted); font-size: 12px; }
+      .detail-photo { width: 76px; height: 76px; border-radius: 18px; object-fit: cover; }
+
+      .toast {
+        position: absolute;
+        top: max(16px, env(safe-area-inset-top));
+        right: 16px;
+        left: 16px;
+        z-index: 50;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: var(--ink);
+        color: #fff;
+        font-size: 12px;
+        text-align: center;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-10px);
+        transition: opacity 200ms ease, transform 240ms var(--ease);
+      }
+
+      .toast.is-visible { opacity: 1; transform: translateY(0); }
+
+      .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+      @keyframes sticker-drop {
+        0% { opacity: 0; transform: translateY(-150px) rotate(-8deg) scale(0.62); }
+        62% { opacity: 1; transform: translateY(18px) rotate(4deg) scale(1.04); }
+        80% { transform: translateY(-7px) rotate(var(--rotate)) scale(0.98); }
+        100% { opacity: 1; transform: translateY(0) rotate(var(--rotate)) scale(var(--scale)); }
+      }
+
+      @media (max-width: 650px) {
+        body { background: var(--paper); }
+        .prototype-wrap { padding: 0; }
+        .app-shell {
+          width: 100%;
+          height: 100dvh;
+          min-height: 0;
+          border: 0;
+          border-radius: 0;
+          box-shadow: none;
+        }
+        .home-header { padding-top: max(28px, calc(env(safe-area-inset-top) + 12px)); }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="prototype-wrap">
+      <section class="app-shell" aria-label="Collect purchase journal prototype">
+        <div class="screen home-screen is-active" id="home-screen">
+          <header class="home-header safe-top">
+            <div>
+              <p class="eyebrow">Collect</p>
+              <h1 class="month" id="month-label">July</h1>
+            </div>
+            <div class="total-wrap">
+              <p class="total-label">This month</p>
+              <p class="total" id="total-label">$128.50</p>
+            </div>
+          </header>
+
+          <section class="collection-stage" id="collection-stage" aria-label="This month's purchase collection">
+            <div class="sticker-field" id="sticker-field"></div>
+            <div class="empty-state" id="empty-state">Your month starts with one small thing.</div>
+            <div class="collection-hint" id="collection-hint">
+              <span class="hint-line" aria-hidden="true"></span>
+              <span>Swipe up to collect</span>
+            </div>
+          </section>
+
+          <footer class="home-footer safe-bottom">
+            <button class="gesture-action" id="open-capture" type="button" aria-label="Open camera to collect a purchase">
+              <span class="gesture-arrow" aria-hidden="true">↑</span>
+              <span>Add a purchase</span>
+            </button>
+          </footer>
+        </div>
+
+        <div class="screen capture-screen" id="capture-screen" aria-hidden="true">
+          <header class="flow-header safe-top">
+            <button class="text-button" id="capture-back" type="button">Back</button>
+            <h2 class="flow-title">New purchase</h2>
+            <span aria-hidden="true" style="width: 38px"></span>
+          </header>
+          <div class="capture-body safe-bottom">
+            <div class="camera-viewport" aria-label="Camera preview">
+              <span class="camera-crosshair" aria-hidden="true"></span>
+              <p class="camera-copy">Place the thing you want to keep in the frame.</p>
+            </div>
+            <div class="camera-controls">
+              <button class="button secondary" id="sample-photo" type="button">Use sample</button>
+              <button class="button" id="take-photo" type="button">Take photo</button>
+            </div>
+            <input class="sr-only" id="photo-input" type="file" accept="image/*" capture="environment" />
+          </div>
+        </div>
+
+        <div class="screen preview-screen" id="preview-screen" aria-hidden="true">
+          <header class="flow-header safe-top">
+            <button class="text-button" id="preview-back" type="button">Back</button>
+            <h2 class="flow-title">Check the photo</h2>
+            <span aria-hidden="true" style="width: 38px"></span>
+          </header>
+          <div class="preview-body safe-bottom">
+            <div class="photo-preview" id="photo-preview"></div>
+            <p class="preview-caption">A quick check keeps the right moment in your collection.</p>
+            <div class="preview-actions">
+              <button class="button secondary" id="retake-photo" type="button">Retake</button>
+              <button class="button" id="use-photo" type="button">Use photo</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="screen price-screen" id="price-screen" aria-hidden="true">
+          <header class="flow-header safe-top">
+            <button class="text-button" id="price-back" type="button">Back</button>
+            <h2 class="flow-title">Add the amount</h2>
+            <span aria-hidden="true" style="width: 38px"></span>
+          </header>
+          <div class="price-body safe-bottom">
+            <div class="processing-card" id="processing-card">
+              <div class="processing-art" id="processing-art" aria-hidden="true">🧋</div>
+              <img id="processing-image" alt="" hidden />
+              <div class="processing-overlay" id="processing-overlay">
+                <span class="processing-label">Making your sticker</span>
+                <span class="progress-track" aria-hidden="true"><span class="progress-bar" id="progress-bar"></span></span>
+                <span class="progress-value" id="progress-value">0%</span>
+              </div>
+            </div>
+            <label class="price-label" for="amount-input">Price is required</label>
+            <div class="price-entry">
+              <span class="currency" aria-hidden="true">$</span>
+              <input id="amount-input" inputmode="decimal" autocomplete="off" type="text" placeholder="0.00" aria-describedby="price-status" />
+            </div>
+            <p class="price-status" id="price-status">Enter the amount while the sticker comes to life.</p>
+          </div>
+        </div>
+
+        <aside class="detail-sheet" id="detail-sheet" aria-live="polite" aria-hidden="true">
+          <div class="detail-top">
+            <h2 class="detail-title">Purchase detail</h2>
+            <button class="detail-close" id="detail-close" type="button" aria-label="Close purchase detail">×</button>
+          </div>
+          <div class="detail-content" id="detail-content"></div>
+        </aside>
+
+        <div class="toast" id="toast" role="status"></div>
+      </section>
+    </main>
+
+    <script>
+      (() => {
+        const STORAGE_KEY = "collect-mvp-purchases-v1";
+        const MONTH = new Intl.DateTimeFormat(undefined, { month: "long" }).format(new Date());
+        const monthLabel = document.getElementById("month-label");
+        const totalLabel = document.getElementById("total-label");
+        const stickerField = document.getElementById("sticker-field");
+        const emptyState = document.getElementById("empty-state");
+        const collectionHint = document.getElementById("collection-hint");
+        const stage = document.getElementById("collection-stage");
+        const amountInput = document.getElementById("amount-input");
+        const priceStatus = document.getElementById("price-status");
+        const processingCard = document.getElementById("processing-card");
+        const processingArt = document.getElementById("processing-art");
+        const processingImage = document.getElementById("processing-image");
+        const progressBar = document.getElementById("progress-bar");
+        const progressValue = document.getElementById("progress-value");
+        const toast = document.getElementById("toast");
+        const detailSheet = document.getElementById("detail-sheet");
+        const detailContent = document.getElementById("detail-content");
+
+        const screens = {
+          home: document.getElementById("home-screen"),
+          capture: document.getElementById("capture-screen"),
+          preview: document.getElementById("preview-screen"),
+          price: document.getElementById("price-screen")
+        };
+
+        let purchases = loadPurchases();
+        let draft = { image: "", hasPhoto: false, generationDone: false, generationTimer: null, saveTimer: null };
+        let touchStartY = 0;
+        let touchStartX = 0;
+        let lastDropId = null;
+
+        const colors = ["#b7dfd5", "#f5d4a7", "#edb8b1", "#d7c4ed", "#b9d7ee", "#f1e7a7"];
+        const emojis = ["🧋", "☕", "🍜", "🎟️", "📚", "🎮", "🌷", "🛍️"];
+        const starterPurchases = [
+          { id: "seed-1", amount: 6.5, emoji: "🧋", bg: "#b7dfd5", createdAt: new Date(Date.now() - 86400000 * 2).toISOString(), seed: true },
+          { id: "seed-2", amount: 18, emoji: "🎟️", bg: "#d7c4ed", createdAt: new Date(Date.now() - 86400000 * 1.25).toISOString(), seed: true },
+          { id: "seed-3", amount: 12.75, emoji: "🍜", bg: "#f5d4a7", createdAt: new Date().toISOString(), seed: true },
+          { id: "seed-4", amount: 91.25, emoji: "📚", bg: "#b9d7ee", createdAt: new Date().toISOString(), seed: true }
+        ];
+
+        monthLabel.textContent = MONTH;
+
+        function loadPurchases() {
+          try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed)) {
+                return parsed.filter((item) => item && typeof item === "object" && Number.isFinite(Number(item.amount)));
+              }
+            }
+          } catch (error) {
+            console.warn("Local storage unavailable", error);
+          }
+          return starterPurchases;
+        }
+
+        function savePurchases() {
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(purchases)); } catch (error) { console.warn("Could not save locally", error); }
+        }
+
+        function money(value) {
+          return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(value);
+        }
+
+        function showScreen(name) {
+          Object.entries(screens).forEach(([key, screen]) => {
+            const active = key === name;
+            screen.classList.toggle("is-active", active);
+            screen.setAttribute("aria-hidden", String(!active));
+          });
+          if (name === "home") renderHome();
+        }
+
+        function renderHome() {
+          const total = purchases.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+          totalLabel.textContent = money(total);
+          stickerField.innerHTML = "";
+          emptyState.hidden = purchases.length > 0;
+          collectionHint.classList.toggle("is-hidden", purchases.length > 0);
+
+          purchases.forEach((purchase, index) => {
+            const sticker = document.createElement("button");
+            sticker.type = "button";
+            sticker.className = "sticker";
+            sticker.dataset.id = purchase.id;
+            sticker.setAttribute("aria-label", `View purchase ${money(purchase.amount)}`);
+            sticker.style.setProperty("--rotate", `${purchase.rotate ?? ((index % 5) - 2) * 4}deg`);
+            sticker.style.setProperty("--scale", `${purchase.scale ?? (0.88 + ((index * 13) % 18) / 100)}`);
+            sticker.style.setProperty("--sticker-bg", purchase.bg || colors[index % colors.length]);
+            sticker.style.left = purchase.left || `${18 + ((index * 29) % 64)}%`;
+            sticker.style.top = purchase.top || `${15 + ((index * 21) % 64)}%`;
+
+            if (purchase.image) {
+              const image = document.createElement("img");
+              image.className = "sticker-photo";
+              image.src = purchase.image;
+              image.alt = "Saved purchase photo";
+              sticker.appendChild(image);
+            } else {
+              const emoji = document.createElement("span");
+              emoji.className = "sticker-emoji";
+              emoji.textContent = purchase.emoji || emojis[index % emojis.length];
+              sticker.appendChild(emoji);
+            }
+
+            const price = document.createElement("span");
+            price.className = "sticker-price";
+            price.textContent = money(purchase.amount);
+            sticker.appendChild(price);
+
+            sticker.addEventListener("click", () => openDetail(purchase));
+            stickerField.appendChild(sticker);
+
+            if (purchase.id === lastDropId) {
+              requestAnimationFrame(() => sticker.classList.add("is-dropping"));
+            }
+          });
+
+          lastDropId = null;
+        }
+
+        function openDetail(purchase) {
+          detailContent.innerHTML = "";
+          const art = purchase.image ? document.createElement("img") : document.createElement("div");
+          art.className = purchase.image ? "detail-photo" : "detail-art";
+          if (purchase.image) {
+            art.src = purchase.image;
+            art.alt = "Original purchase photo";
+          } else {
+            art.textContent = purchase.emoji || "•";
+            art.style.background = purchase.bg || "#efefef";
+          }
+          const meta = document.createElement("div");
+          meta.className = "detail-meta";
+          const strong = document.createElement("strong");
+          strong.textContent = money(purchase.amount);
+          const date = document.createElement("span");
+          date.textContent = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(purchase.createdAt));
+          const note = document.createElement("span");
+          note.textContent = "A piece of this month.";
+          meta.append(strong, date, note);
+          detailContent.append(art, meta);
+          detailSheet.classList.add("is-open");
+          detailSheet.setAttribute("aria-hidden", "false");
+        }
+
+        function closeDetail() {
+          detailSheet.classList.remove("is-open");
+          detailSheet.setAttribute("aria-hidden", "true");
+        }
+
+        function resetDraft() {
+          if (draft.generationTimer) clearInterval(draft.generationTimer);
+          if (draft.saveTimer) clearTimeout(draft.saveTimer);
+          draft = { image: "", hasPhoto: false, generationDone: false, generationTimer: null, saveTimer: null };
+          amountInput.value = "";
+          processingImage.hidden = true;
+          processingImage.removeAttribute("src");
+          processingCard.classList.remove("has-photo", "is-ready");
+          processingArt.hidden = false;
+          processingArt.textContent = "🧋";
+          progressBar.style.width = "0%";
+          progressValue.textContent = "0%";
+          priceStatus.textContent = "Enter the amount while the sticker comes to life.";
+          priceStatus.classList.remove("is-ready");
+        }
+
+        function openCapture() {
+          closeDetail();
+          resetDraft();
+          showScreen("capture");
+        }
+
+        function setPhotoPreview(src, isImage) {
+          const preview = document.getElementById("photo-preview");
+          preview.innerHTML = "";
+          if (isImage) {
+            const image = document.createElement("img");
+            image.src = src;
+            image.alt = "Photo preview";
+            preview.appendChild(image);
+          } else {
+            const sample = document.createElement("div");
+            sample.className = "sample-product";
+            sample.textContent = "🧋";
+            preview.appendChild(sample);
+          }
+        }
+
+        function openPreview(src) {
+          draft.image = src || "";
+          draft.hasPhoto = Boolean(src);
+          setPhotoPreview(src, Boolean(src));
+          showScreen("preview");
+        }
+
+        function startStickerGeneration() {
+          showScreen("price");
+          processingCard.classList.toggle("has-photo", Boolean(draft.image));
+          if (draft.image) {
+            processingImage.hidden = false;
+            processingImage.src = draft.image;
+            processingArt.hidden = true;
+          }
+          let progress = 0;
+          draft.generationDone = false;
+          draft.generationTimer = setInterval(() => {
+            progress += Math.floor(Math.random() * 13) + 7;
+            if (progress >= 100) progress = 100;
+            progressBar.style.width = `${progress}%`;
+            progressValue.textContent = `${progress}%`;
+            if (progress >= 100) {
+              clearInterval(draft.generationTimer);
+              draft.generationTimer = null;
+              draft.generationDone = true;
+              processingCard.classList.add("is-ready");
+              priceStatus.textContent = "Sticker ready. Finish the amount to collect it.";
+              priceStatus.classList.add("is-ready");
+              commitIfReady();
+            }
+          }, 110);
+          setTimeout(() => amountInput.focus(), 120);
+        }
+
+        function parseAmount() {
+          const normalized = amountInput.value.replace(/[^0-9.]/g, "");
+          const amount = Number(normalized);
+          return Number.isFinite(amount) && amount > 0 ? amount : null;
+        }
+
+        function commitIfReady() {
+          const amount = parseAmount();
+          if (!amount || !draft.generationDone || draft.saveTimer) return;
+          priceStatus.textContent = "Adding it to your month...";
+          draft.saveTimer = setTimeout(() => {
+            const index = purchases.length;
+            const item = {
+              id: `purchase-${Date.now()}`,
+              amount,
+              image: draft.image,
+              emoji: emojis[index % emojis.length],
+              bg: colors[index % colors.length],
+              createdAt: new Date().toISOString(),
+              left: `${16 + ((index * 31) % 68)}%`,
+              top: `${18 + ((index * 23) % 62)}%`,
+              rotate: ((index % 5) - 2) * 4,
+              scale: 0.94 + ((index * 9) % 15) / 100
+            };
+            purchases = [...purchases, item];
+            savePurchases();
+            lastDropId = item.id;
+            resetDraft();
+            showScreen("home");
+            showToast("Collected for this month");
+          }, 360);
+        }
+
+        function showToast(message) {
+          toast.textContent = message;
+          toast.classList.add("is-visible");
+          setTimeout(() => toast.classList.remove("is-visible"), 1800);
+        }
+
+        document.getElementById("open-capture").addEventListener("click", openCapture);
+        document.getElementById("capture-back").addEventListener("click", () => showScreen("home"));
+        document.getElementById("preview-back").addEventListener("click", () => showScreen("capture"));
+        document.getElementById("price-back").addEventListener("click", () => {
+          if (draft.generationTimer) clearInterval(draft.generationTimer);
+          if (draft.saveTimer) clearTimeout(draft.saveTimer);
+          draft.generationTimer = null;
+          draft.saveTimer = null;
+          draft.generationDone = false;
+          amountInput.value = "";
+          showScreen("preview");
+        });
+        document.getElementById("detail-close").addEventListener("click", closeDetail);
+        document.getElementById("retake-photo").addEventListener("click", () => showScreen("capture"));
+        document.getElementById("use-photo").addEventListener("click", startStickerGeneration);
+
+        document.getElementById("take-photo").addEventListener("click", () => document.getElementById("photo-input").click());
+        document.getElementById("sample-photo").addEventListener("click", () => openPreview(""));
+        document.getElementById("photo-input").addEventListener("change", (event) => {
+          const file = event.target.files && event.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => openPreview(reader.result);
+          reader.readAsDataURL(file);
+          event.target.value = "";
+        });
+
+        amountInput.addEventListener("input", () => {
+          if (draft.saveTimer) {
+            clearTimeout(draft.saveTimer);
+            draft.saveTimer = null;
+          }
+          amountInput.value = amountInput.value.replace(/[^0-9.]/g, "");
+          const amount = parseAmount();
+          if (!amount) {
+            priceStatus.textContent = "Enter an amount to continue.";
+            priceStatus.classList.remove("is-ready");
+          } else if (!draft.generationDone) {
+            priceStatus.textContent = "Sticker is still coming to life...";
+          }
+          commitIfReady();
+        });
+
+        amountInput.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commitIfReady();
+          }
+        });
+
+        stage.addEventListener("touchstart", (event) => {
+          touchStartY = event.changedTouches[0].clientY;
+          touchStartX = event.changedTouches[0].clientX;
+        }, { passive: true });
+
+        stage.addEventListener("touchend", (event) => {
+          const touch = event.changedTouches[0];
+          const deltaY = touch.clientY - touchStartY;
+          const deltaX = touch.clientX - touchStartX;
+          if (deltaY < -48 && Math.abs(deltaY) > Math.abs(deltaX) * 1.15) openCapture();
+        }, { passive: true });
+
+        stage.addEventListener("click", (event) => {
+          const clickedEmptyArea = event.target === stage || event.target === stickerField || event.target === emptyState || event.target === collectionHint;
+          if (clickedEmptyArea) openCapture();
+        });
+
+        window.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") {
+            if (detailSheet.classList.contains("is-open")) closeDetail();
+            else showScreen("home");
+          }
+          if (event.key === "ArrowUp" && screens.home.classList.contains("is-active")) openCapture();
+        });
+
+        try {
+          renderHome();
+        } catch (error) {
+          console.error("Collect failed to initialize", error);
+          purchases = starterPurchases;
+          renderHome();
+        }
+      })();
+    </script>
+  </body>
+</html>
