@@ -22,6 +22,33 @@ function roundedRect(context, x, y, width, height, radius) {
 function drawSticker(context, body, image, dpr) {
   const size = body.plugin?.stickerSize || 150;
   const half = size / 2;
+  const isCutout = Boolean(body.plugin?.purchase?.stickerCutout);
+  if (isCutout) {
+    context.save();
+    context.translate(body.position.x, body.position.y);
+    context.rotate(body.angle);
+    if (image?.complete && image.naturalWidth > 0) {
+      const imageRatio = image.naturalWidth / image.naturalHeight;
+      const frameSize = size * 0.86;
+      let drawWidth = frameSize;
+      let drawHeight = frameSize;
+      if (imageRatio > 1) drawHeight = frameSize / imageRatio;
+      else drawWidth = frameSize * imageRatio;
+
+      // The cutout is normalized before it reaches the canvas. The white shadow
+      // follows its alpha edge, creating the physical sticker contour.
+      context.shadowColor = "rgba(255, 255, 255, 0.98)";
+      context.shadowBlur = 9 * dpr;
+      context.shadowOffsetX = 0;
+      context.shadowOffsetY = 0;
+      context.drawImage(image, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+      context.shadowColor = "transparent";
+      context.shadowBlur = 0;
+      context.drawImage(image, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+    }
+    context.restore();
+    return;
+  }
   const radius = Math.min(24, size * 0.16);
   context.save();
   context.translate(body.position.x, body.position.y);
@@ -128,10 +155,11 @@ export default function StickerPhysicsCanvas({ purchases, onCanvasReady }) {
         const body = createStickerBody({ purchase, index, width });
         bodiesRef.current.set(purchase.id, body);
         Composite.add(engine.world, body);
-        if (purchase.image) {
+        const source = purchase.sticker || purchase.image;
+        if (source) {
           const image = new Image();
           image.onload = () => imagesRef.current.set(purchase.id, image);
-          image.src = purchase.image;
+          image.src = source;
         }
       });
     }
@@ -224,10 +252,11 @@ export default function StickerPhysicsCanvas({ purchases, onCanvasReady }) {
       const body = createStickerBody({ purchase, index, width: rect.width });
       bodyMap.set(purchase.id, body);
       Composite.add(engine.world, body);
-      if (purchase.image) {
+      const source = purchase.sticker || purchase.image;
+      if (source) {
         const image = new Image();
         image.onload = () => imagesRef.current.set(purchase.id, image);
-        image.src = purchase.image;
+        image.src = source;
       }
     });
     purchasesRef.current = purchases;

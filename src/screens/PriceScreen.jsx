@@ -1,13 +1,34 @@
 import { useEffect, useState } from "react";
 import { useAppState } from "../state/AppState";
+import { createStickerImage } from "../processing/stickerProcessing";
 
 export default function PriceScreen() {
-  const { draft, updateAmount, backToPreview, collectPurchase } = useAppState();
+  const { draft, updateAmount, setSticker, backToPreview, collectPurchase } = useAppState();
   const [isMaking, setIsMaking] = useState(true);
+  const [processingError, setProcessingError] = useState("");
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setIsMaking(false), 720);
-    return () => window.clearTimeout(timer);
+    let active = true;
+    setIsMaking(true);
+    setProcessingError("");
+    setSticker("");
+
+    createStickerImage(draft.image)
+      .then((sticker) => {
+        if (active) setSticker(sticker);
+      })
+      .catch(() => {
+        if (active) setProcessingError("Photo kept as a sticker");
+      })
+      .finally(() => {
+        if (active) setIsMaking(false);
+      });
+
+    return () => {
+      active = false;
+    };
+    // setSticker is intentionally omitted: typing the amount must not restart image processing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.image]);
 
   useEffect(() => {
@@ -26,9 +47,9 @@ export default function PriceScreen() {
       </header>
       <section className="flex flex-1 flex-col items-center px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-6">
         <div className="flex w-full max-w-sm flex-1 items-center justify-center rounded-[1.5rem] bg-neutral-100 p-8">
-          <img className={`max-h-full max-w-full rounded-2xl object-contain transition-opacity ${isMaking ? "opacity-45" : "opacity-100"}`} src={draft.image} alt="Sticker being created" />
+          <img className={`max-h-full max-w-full object-contain transition-opacity ${isMaking ? "opacity-45" : "opacity-100"}`} src={draft.sticker || draft.image} alt="Sticker being created" />
         </div>
-        <p className="mt-5 text-xs uppercase tracking-[0.16em] text-neutral-400">{isMaking ? "Making your sticker" : "Sticker ready"}</p>
+        <p className="mt-5 text-xs uppercase tracking-[0.16em] text-neutral-400">{isMaking ? "Making your sticker" : processingError || "Sticker ready"}</p>
         <label className="mt-8 text-sm text-neutral-500" htmlFor="amount">Price is required</label>
         <div className="mt-3 flex items-center border-b-2 border-neutral-950 pb-2">
           <span className="mr-2 text-3xl font-light">$</span>
