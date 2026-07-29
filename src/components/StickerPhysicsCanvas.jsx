@@ -37,14 +37,26 @@ function drawSticker(context, body, image, dpr) {
 
       // The cutout is normalized before it reaches the canvas. The white shadow
       // follows its alpha edge, creating the physical sticker contour.
-      context.shadowColor = "rgba(255, 255, 255, 0.98)";
-      context.shadowBlur = 9 * dpr;
-      context.shadowOffsetX = 0;
-      context.shadowOffsetY = 0;
+      const outline = Math.max(2.5, size * 0.026);
+      context.globalCompositeOperation = "source-over";
+      context.filter = "brightness(0) invert(1)";
+      for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
+        context.drawImage(
+          image,
+          -drawWidth / 2 + Math.cos(angle) * outline,
+          -drawHeight / 2 + Math.sin(angle) * outline,
+          drawWidth,
+          drawHeight
+        );
+      }
+      context.filter = "none";
+      context.shadowColor = "rgba(0, 0, 0, 0.14)";
+      context.shadowBlur = 5 * dpr;
+      context.shadowOffsetY = 3 * dpr;
       context.drawImage(image, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
       context.shadowColor = "transparent";
       context.shadowBlur = 0;
-      context.drawImage(image, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+      context.shadowOffsetY = 0;
     }
     context.restore();
     return;
