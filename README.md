@@ -12,8 +12,8 @@ The prototype includes:
 - swipe-up or click-to-open capture flow
 - photo upload or sample photo
 - preview, retake, and use-photo states
-- simulated sticker generation progress
+- in-browser subject/background removal with a white sticker outline
 - required amount entry
 - automatic local save and sticker drop animation
 
-No external dependencies are required.
+The photo cutout uses `@imgly/background-removal` in the browser. The first real photo may take longer while the model assets load; later photos reuse the browser cache. For live camera access, open the GitHub Pages version or another HTTPS/localhost origin.
