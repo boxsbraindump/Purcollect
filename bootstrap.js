@@ -1,7 +1,7 @@
 const isGitHubPages = window.location.hostname.endsWith("github.io") && window.location.pathname.startsWith("/Purcollect");
 
 if (isGitHubPages) {
-  const buildVersion = "price-progress-20260729";
+  const buildVersion = "worker-price-20260729";
   const stylesheet = document.createElement("link");
   stylesheet.rel = "stylesheet";
   stylesheet.href = `./assets/app.css?v=${buildVersion}`;

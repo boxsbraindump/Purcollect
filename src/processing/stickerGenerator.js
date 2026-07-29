@@ -1,5 +1,3 @@
-import { removeBackground } from "@imgly/background-removal";
-
 const OUTLINE_WIDTH = 6;
 const OUTLINE_SOURCE_PX = 22;
 
@@ -20,6 +18,46 @@ async function rasterizeSource(source) {
   const context = canvas.getContext("2d");
   context.drawImage(image, 0, 0);
   return canvas.toDataURL("image/png");
+}
+
+function removeBackgroundInWorker(source, onProgress) {
+  return new Promise((resolve, reject) => {
+    let worker;
+
+    try {
+      worker = new Worker(new URL("./stickerBackgroundWorker.js", import.meta.url), { type: "module" });
+    } catch (error) {
+      reject(error);
+      return;
+    }
+
+    const cleanup = () => worker.terminate();
+    worker.onmessage = (event) => {
+      const message = event.data || {};
+
+      if (message.type === "progress") {
+        const ratio = message.total > 0 ? message.current / message.total : 0;
+        onProgress({
+          phase: "extracting",
+          progress: Math.round(8 + ratio * 70),
+          key: message.key
+        });
+        return;
+      }
+
+      cleanup();
+      if (message.type === "result") {
+        resolve(message.blob);
+      } else {
+        reject(new Error(message.message || "Sticker generation failed"));
+      }
+    };
+    worker.onerror = (error) => {
+      cleanup();
+      reject(error.error || new Error("Sticker worker failed"));
+    };
+    worker.postMessage({ source });
+  });
 }
 
 function findAlphaBounds(context, width, height) {
@@ -135,18 +173,7 @@ export async function generateSticker(source, onProgress = () => {}) {
   onProgress({ phase: "preparing", progress: 4 });
   const rasterSource = await rasterizeSource(source);
   onProgress({ phase: "extracting", progress: 8 });
-  const cutoutBlob = await removeBackground(rasterSource, {
-    output: { format: "image/png" },
-    model: "isnet_quint8",
-    progress: (key, current, total) => {
-      const ratio = total > 0 ? current / total : 0;
-      onProgress({
-        phase: "extracting",
-        progress: Math.round(8 + ratio * 70),
-        key
-      });
-    }
-  });
+  const cutoutBlob = await removeBackgroundInWorker(rasterSource, onProgress);
   const cutoutUrl = URL.createObjectURL(cutoutBlob);
 
   try {
