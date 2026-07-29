@@ -183,7 +183,7 @@
         position: absolute;
         display: grid;
         place-items: center;
-        width: clamp(54px, 17vw, 78px);
+        width: clamp(104px, 34vw, 154px);
         aspect-ratio: 1;
         overflow: visible;
         border: 0;
@@ -214,7 +214,13 @@
       }
 
       .sticker.is-dropping {
-        animation: sticker-drop 880ms var(--ease) both;
+        z-index: 9;
+        transform-origin: 50% 100%;
+        animation: sticker-drop 1180ms var(--ease) both;
+      }
+
+      .sticker.is-rippling {
+        animation: sticker-ripple 620ms var(--ease) both;
       }
 
       .sticker-emoji {
@@ -249,12 +255,12 @@
         position: absolute;
         right: -5px;
         bottom: -7px;
-        padding: 4px 7px;
+        padding: 5px 8px;
         border: 2px solid #fff;
         border-radius: 999px;
         background: var(--ink);
         color: #fff;
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 700;
         letter-spacing: -0.02em;
       }
@@ -644,10 +650,18 @@
       .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
       @keyframes sticker-drop {
-        0% { opacity: 0; transform: translateY(-150px) rotate(-8deg) scale(0.62); }
-        62% { opacity: 1; transform: translateY(18px) rotate(4deg) scale(1.04); }
-        80% { transform: translateY(-7px) rotate(var(--rotate)) scale(0.98); }
+        0% { opacity: 0; transform: translateY(-290px) rotate(-18deg) scale(0.44); }
+        42% { opacity: 1; transform: translateY(54px) rotate(12deg) scale(1.08); }
+        59% { transform: translateY(-18px) rotate(-7deg) scale(0.98); }
+        73% { transform: translateY(10px) rotate(4deg) scale(1.03); }
+        84% { transform: translateY(-5px) rotate(calc(var(--rotate) - 2deg)) scale(0.99); }
         100% { opacity: 1; transform: translateY(0) rotate(var(--rotate)) scale(var(--scale)); }
+      }
+
+      @keyframes sticker-ripple {
+        0%, 100% { transform: rotate(var(--rotate)) scale(var(--scale)); }
+        34% { transform: translate(6px, -3px) rotate(calc(var(--rotate) + 3deg)) scale(calc(var(--scale) * 1.03)); }
+        66% { transform: translate(-4px, 2px) rotate(calc(var(--rotate) - 2deg)) scale(calc(var(--scale) * 0.98)); }
       }
 
       @media (max-width: 650px) {
@@ -911,6 +925,8 @@
 
             if (purchase.id === lastDropId) {
               requestAnimationFrame(() => sticker.classList.add("is-dropping"));
+            } else if (lastDropId) {
+              requestAnimationFrame(() => sticker.classList.add("is-rippling"));
             }
           });
 
