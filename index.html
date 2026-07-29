@@ -754,7 +754,6 @@
           price: document.getElementById("price-screen")
         };
 
-        let purchases = loadPurchases();
         let draft = { image: "", hasPhoto: false, generationDone: false, generationTimer: null, saveTimer: null };
         let touchStartY = 0;
         let touchStartX = 0;
@@ -768,6 +767,8 @@
           { id: "seed-3", amount: 12.75, emoji: "🍜", bg: "#f5d4a7", createdAt: new Date().toISOString(), seed: true },
           { id: "seed-4", amount: 91.25, emoji: "📚", bg: "#b9d7ee", createdAt: new Date().toISOString(), seed: true }
         ];
+
+        let purchases = loadPurchases();
 
         monthLabel.textContent = MONTH;
 
