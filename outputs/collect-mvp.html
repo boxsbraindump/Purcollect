@@ -333,6 +333,23 @@
         background: #161616;
       }
 
+      .camera-video {
+        display: none;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .camera-viewport.has-live-feed .camera-video { display: block; }
+
+      .camera-viewport.has-live-feed .camera-crosshair { z-index: 2; }
+
+      .camera-viewport.has-live-feed .camera-copy {
+        z-index: 2;
+        color: rgba(255, 255, 255, 0.9);
+        text-shadow: 0 1px 8px rgba(0, 0, 0, 0.38);
+      }
+
       .camera-viewport::before {
         position: absolute;
         inset: 19px;
@@ -365,6 +382,25 @@
         left: 0;
         color: rgba(255, 255, 255, 0.76);
         font-size: 12px;
+        text-align: center;
+      }
+
+      .camera-status {
+        min-height: 18px;
+        margin: 10px 2px 0;
+        color: #8a8a8a;
+        font-size: 11px;
+        line-height: 1.4;
+        text-align: center;
+      }
+
+      .camera-status.is-error { color: #555; }
+
+      .upload-link {
+        display: block;
+        width: 100%;
+        min-height: 34px;
+        margin-top: 8px;
         text-align: center;
       }
 
@@ -662,13 +698,16 @@
           </header>
           <div class="capture-body safe-bottom">
             <div class="camera-viewport" aria-label="Camera preview">
+              <video class="camera-video" id="camera-video" autoplay playsinline muted aria-label="Live camera preview"></video>
               <span class="camera-crosshair" aria-hidden="true"></span>
               <p class="camera-copy">Place the thing you want to keep in the frame.</p>
             </div>
+            <p class="camera-status" id="camera-status">Camera access is requested when this screen opens.</p>
             <div class="camera-controls">
               <button class="button secondary" id="sample-photo" type="button">Use sample</button>
-              <button class="button" id="take-photo" type="button">Take photo</button>
+              <button class="button" id="take-photo" type="button">Capture</button>
             </div>
+            <button class="text-button upload-link" id="upload-photo" type="button">Upload a photo instead</button>
             <input class="sr-only" id="photo-input" type="file" accept="image/*" capture="environment" />
           </div>
         </div>
@@ -736,6 +775,9 @@
         const emptyState = document.getElementById("empty-state");
         const collectionHint = document.getElementById("collection-hint");
         const stage = document.getElementById("collection-stage");
+        const cameraViewport = document.querySelector(".camera-viewport");
+        const cameraVideo = document.getElementById("camera-video");
+        const cameraStatus = document.getElementById("camera-status");
         const amountInput = document.getElementById("amount-input");
         const priceStatus = document.getElementById("price-status");
         const processingCard = document.getElementById("processing-card");
@@ -758,6 +800,7 @@
         let touchStartY = 0;
         let touchStartX = 0;
         let lastDropId = null;
+        let cameraStream = null;
 
         const colors = ["#b7dfd5", "#f5d4a7", "#edb8b1", "#d7c4ed", "#b9d7ee", "#f1e7a7"];
         const emojis = ["🧋", "☕", "🍜", "🎟️", "📚", "🎮", "🌷", "🛍️"];
@@ -796,6 +839,7 @@
         }
 
         function showScreen(name) {
+          if (name !== "capture") stopCamera();
           Object.entries(screens).forEach(([key, screen]) => {
             const active = key === name;
             screen.classList.toggle("is-active", active);
@@ -898,10 +942,60 @@
           priceStatus.classList.remove("is-ready");
         }
 
+        function stopCamera() {
+          if (cameraStream) {
+            cameraStream.getTracks().forEach((track) => track.stop());
+            cameraStream = null;
+          }
+          cameraVideo.pause();
+          cameraVideo.srcObject = null;
+          cameraViewport.classList.remove("has-live-feed");
+        }
+
+        async function startCamera() {
+          cameraStatus.classList.remove("is-error");
+          cameraStatus.textContent = "Requesting camera access...";
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            cameraStatus.textContent = "Camera is unavailable here. Use Upload a photo instead.";
+            cameraStatus.classList.add("is-error");
+            return;
+          }
+          try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+              audio: false,
+              video: {
+                facingMode: { ideal: "environment" },
+                width: { ideal: 1280 },
+                height: { ideal: 1920 }
+              }
+            });
+            cameraVideo.srcObject = cameraStream;
+            cameraViewport.classList.add("has-live-feed");
+            cameraStatus.textContent = "Point at the purchase, then tap Capture.";
+          } catch (error) {
+            cameraStatus.textContent = "Camera access was blocked. Use Upload a photo instead.";
+            cameraStatus.classList.add("is-error");
+          }
+        }
+
+        function captureFrame() {
+          if (!cameraStream || !cameraVideo.videoWidth || !cameraVideo.videoHeight) {
+            cameraStatus.textContent = "Camera is not ready yet. Use Upload a photo instead.";
+            cameraStatus.classList.add("is-error");
+            return;
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = cameraVideo.videoWidth;
+          canvas.height = cameraVideo.videoHeight;
+          canvas.getContext("2d").drawImage(cameraVideo, 0, 0, canvas.width, canvas.height);
+          openPreview(canvas.toDataURL("image/jpeg", 0.88));
+        }
+
         function openCapture() {
           closeDetail();
           resetDraft();
           showScreen("capture");
+          startCamera();
         }
 
         function setPhotoPreview(src, isImage) {
@@ -996,7 +1090,7 @@
 
         document.getElementById("open-capture").addEventListener("click", openCapture);
         document.getElementById("capture-back").addEventListener("click", () => showScreen("home"));
-        document.getElementById("preview-back").addEventListener("click", () => showScreen("capture"));
+        document.getElementById("preview-back").addEventListener("click", openCapture);
         document.getElementById("price-back").addEventListener("click", () => {
           if (draft.generationTimer) clearInterval(draft.generationTimer);
           if (draft.saveTimer) clearTimeout(draft.saveTimer);
@@ -1007,10 +1101,11 @@
           showScreen("preview");
         });
         document.getElementById("detail-close").addEventListener("click", closeDetail);
-        document.getElementById("retake-photo").addEventListener("click", () => showScreen("capture"));
+        document.getElementById("retake-photo").addEventListener("click", openCapture);
         document.getElementById("use-photo").addEventListener("click", startStickerGeneration);
 
-        document.getElementById("take-photo").addEventListener("click", () => document.getElementById("photo-input").click());
+        document.getElementById("take-photo").addEventListener("click", captureFrame);
+        document.getElementById("upload-photo").addEventListener("click", () => document.getElementById("photo-input").click());
         document.getElementById("sample-photo").addEventListener("click", () => openPreview(""));
         document.getElementById("photo-input").addEventListener("change", (event) => {
           const file = event.target.files && event.target.files[0];
