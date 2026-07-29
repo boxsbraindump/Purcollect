@@ -37,15 +37,15 @@ export default function PriceScreen() {
   const shownAmount = draft.amount || "0";
 
   return (
-    <main className="grid min-h-[100svh] grid-rows-[auto_minmax(9rem,1fr)_minmax(5.75rem,0.28fr)_minmax(14rem,0.55fr)] overflow-hidden bg-white text-neutral-950">
-      <header className="flex items-center justify-between px-6 pb-2 pt-[max(1.1rem,calc(env(safe-area-inset-top)+0.7rem))]">
+    <main className="grid h-[100dvh] grid-rows-[calc(env(safe-area-inset-top)+3.25rem)_34dvh_15dvh_minmax(0,1fr)] overflow-hidden bg-white text-neutral-950">
+      <header className="flex items-center justify-between px-6 pt-[max(0.2rem,env(safe-area-inset-top))]">
         <button className="min-h-11 px-1 text-sm text-neutral-400 transition active:scale-[0.98]" type="button" onClick={backToPreview}>Back</button>
         <span className="text-xs font-medium uppercase tracking-[0.16em] text-neutral-400">Collect</span>
         <span className="w-10" aria-hidden="true" />
       </header>
 
-      <section className="flex min-h-0 items-center justify-center px-8 py-3" aria-label="Your new sticker">
-        <img className="max-h-full max-w-[min(72vw,19rem)] object-contain drop-shadow-[0_18px_26px_rgba(0,0,0,0.12)]" src={draft.stickerAsset?.image || draft.image} alt="Your sticker" />
+      <section className="flex min-h-0 items-center justify-center px-8 py-2" aria-label="Your new sticker">
+        <img className="max-h-[27dvh] max-w-[62vw] object-contain drop-shadow-[0_18px_26px_rgba(0,0,0,0.12)]" src={draft.stickerAsset?.image || draft.image} alt="Your sticker" />
       </section>
 
       <section className="flex min-h-0 items-end justify-center px-6 pb-2 pt-1" aria-live="polite">
@@ -54,11 +54,11 @@ export default function PriceScreen() {
         </output>
       </section>
 
-      <section className="grid min-h-0 grid-cols-3 content-center gap-x-7 gap-y-1 px-10 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 sm:px-16">
+      <section className="grid min-h-0 grid-cols-3 grid-rows-[repeat(5,minmax(0,1fr))] gap-x-7 gap-y-1 px-10 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 sm:px-16">
         {numberKeys.map((key) => (
           <button
             key={key}
-            className="min-h-12 rounded-2xl text-2xl font-medium tabular-nums transition duration-100 active:scale-90 active:bg-neutral-100"
+            className="min-h-0 rounded-2xl text-2xl font-medium tabular-nums transition duration-100 active:scale-90 active:bg-neutral-100"
             type="button"
             onClick={() => pressKey(key)}
             aria-label={key === "." ? "Decimal" : key}
@@ -66,8 +66,8 @@ export default function PriceScreen() {
             {key}
           </button>
         ))}
-        <button className="min-h-12 rounded-2xl text-xl text-neutral-500 transition duration-100 active:scale-90 active:bg-neutral-100" type="button" onClick={erase} aria-label="Delete last digit">⌫</button>
-        <button className={`col-span-3 mt-1 min-h-12 rounded-2xl text-sm font-semibold transition duration-150 ${canCollect ? "bg-neutral-950 text-white active:scale-[0.98]" : "bg-neutral-100 text-neutral-300"}`} type="button" onClick={submit} disabled={!canCollect}>
+        <button className="min-h-0 rounded-2xl text-sm font-medium text-neutral-500 transition duration-100 active:scale-90 active:bg-neutral-100" type="button" onClick={erase} aria-label="Delete last digit">Del</button>
+        <button className={`col-span-3 mt-1 min-h-0 rounded-2xl text-sm font-semibold transition duration-150 ${canCollect ? "bg-neutral-950 text-white active:scale-[0.98]" : "bg-neutral-100 text-neutral-300"}`} type="button" onClick={submit} disabled={!canCollect}>
           Collect
         </button>
       </section>

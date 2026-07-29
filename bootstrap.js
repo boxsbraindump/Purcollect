@@ -1,7 +1,7 @@
 const isGitHubPages = window.location.hostname.endsWith("github.io") && window.location.pathname.startsWith("/Purcollect");
 
 if (isGitHubPages) {
-  const buildVersion = "fixed-mobile-keypad-20260729";
+  const buildVersion = "single-screen-amount-20260729";
   const stylesheet = document.createElement("link");
   stylesheet.rel = "stylesheet";
   stylesheet.href = `./assets/app.css?v=${buildVersion}`;
