@@ -134,7 +134,7 @@
         min-height: 0;
         overflow: hidden;
         margin-top: 6px;
-        touch-action: pan-y;
+        touch-action: none;
       }
 
       .collection-stage::after {
@@ -1043,17 +1043,22 @@
           }
         });
 
-        stage.addEventListener("touchstart", (event) => {
-          touchStartY = event.changedTouches[0].clientY;
-          touchStartX = event.changedTouches[0].clientX;
-        }, { passive: true });
+        stage.addEventListener("pointerdown", (event) => {
+          if (!event.isPrimary) return;
+          touchStartY = event.clientY;
+          touchStartX = event.clientX;
+          stage.setPointerCapture?.(event.pointerId);
+        });
 
-        stage.addEventListener("touchend", (event) => {
-          const touch = event.changedTouches[0];
-          const deltaY = touch.clientY - touchStartY;
-          const deltaX = touch.clientX - touchStartX;
-          if (deltaY < -48 && Math.abs(deltaY) > Math.abs(deltaX) * 1.15) openCapture();
-        }, { passive: true });
+        stage.addEventListener("pointerup", (event) => {
+          if (!event.isPrimary) return;
+          const deltaY = event.clientY - touchStartY;
+          const deltaX = event.clientX - touchStartX;
+          if (deltaY < -48 && Math.abs(deltaY) > Math.abs(deltaX) * 1.15) {
+            event.preventDefault();
+            openCapture();
+          }
+        });
 
         stage.addEventListener("click", (event) => {
           const clickedEmptyArea = event.target === stage || event.target === stickerField || event.target === emptyState || event.target === collectionHint;
